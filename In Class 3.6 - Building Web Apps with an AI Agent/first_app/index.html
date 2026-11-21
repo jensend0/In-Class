@@ -183,7 +183,7 @@
         <h2 class="card-title">Beam</h2>
         <div class="field">
           <div class="field-label"><span>Support type</span></div>
-          <select>
+          <select id="supportSelect">
             <option selected>Simply supported</option>
             <option>Cantilever</option>
           </select>
@@ -245,9 +245,9 @@
             <line x1="80" y1="106" x2="820" y2="106" stroke="#b7c2cf"/>
             <path d="M80 106l8-8 8 8M96 106l8-8 8 8M112 106l8-8 8 8M128 106l8-8 8 8M144 106l8-8 8 8M160 106l8-8 8 8M176 106l8-8 8 8M192 106l8-8 8 8M208 106l8-8 8 8M224 106l8-8 8 8M240 106l8-8 8 8M256 106l8-8 8 8M272 106l8-8 8 8M288 106l8-8 8 8M304 106l8-8 8 8M320 106l8-8 8 8M336 106l8-8 8 8M352 106l8-8 8 8M368 106l8-8 8 8M384 106l8-8 8 8M400 106l8-8 8 8M416 106l8-8 8 8M432 106l8-8 8 8M448 106l8-8 8 8M464 106l8-8 8 8M480 106l8-8 8 8M496 106l8-8 8 8M512 106l8-8 8 8M528 106l8-8 8 8M544 106l8-8 8 8M560 106l8-8 8 8M576 106l8-8 8 8M592 106l8-8 8 8M608 106l8-8 8 8M624 106l8-8 8 8M640 106l8-8 8 8M656 106l8-8 8 8M672 106l8-8 8 8M688 106l8-8 8 8M704 106l8-8 8 8M720 106l8-8 8 8M736 106l8-8 8 8M752 106l8-8 8 8M768 106l8-8 8 8M784 106l8-8 8 8M800 106l8-8 8 8" stroke="#2563eb" stroke-width="2" fill="none"/>
             <line x1="80" y1="58" x2="80" y2="34" stroke="#16a34a" stroke-width="3"/><polygon points="80,58 72,40 88,40" fill="#16a34a"/>
-            <text x="80" y="28" text-anchor="middle" fill="#15803d" font-size="12" font-weight="800">10.0 k</text>
+            <text id="leftReactionText" x="80" y="28" text-anchor="middle" fill="#15803d" font-size="12" font-weight="800">10.0 k</text>
             <line x1="820" y1="58" x2="820" y2="34" stroke="#16a34a" stroke-width="3"/><polygon points="820,58 812,40 828,40" fill="#16a34a"/>
-            <text x="820" y="28" text-anchor="middle" fill="#15803d" font-size="12" font-weight="800">10.0 k</text>
+            <text id="rightReactionText" x="820" y="28" text-anchor="middle" fill="#15803d" font-size="12" font-weight="800">10.0 k</text>
             <text x="80" y="122" fill="#64748b" font-size="11">0 ft</text><text x="450" y="122" text-anchor="middle" fill="#64748b" font-size="11">10 ft</text><text x="820" y="122" text-anchor="end" fill="#64748b" font-size="11">20 ft</text>
           </svg>
         </section>
@@ -255,7 +255,7 @@
         <section class="card plots-card">
           <div class="plot">
             <div class="plot-label"><strong>Shear</strong>kips</div>
-            <svg viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Placeholder shear diagram">
+            <svg id="shearPlot" viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Calculated shear diagram">
               <line x1="0" y1="48" x2="740" y2="48" stroke="#e4eaf2"/>
               <path d="M0 48H20V20H720V48H740V76Z" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
               <line x1="20" y1="48" x2="20" y2="20" stroke="#2563eb" stroke-dasharray="3 3"/>
@@ -266,7 +266,7 @@
           </div>
           <div class="plot">
             <div class="plot-label"><strong>Moment</strong>kip-ft</div>
-            <svg viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Placeholder moment diagram">
+            <svg id="momentPlot" viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Calculated moment diagram">
               <line x1="0" y1="76" x2="740" y2="76" stroke="#e4eaf2"/>
               <path d="M0 76L370 10L740 76Z" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
               <line x1="370" y1="10" x2="370" y2="76" stroke="#16a34a" stroke-dasharray="3 3"/>
@@ -319,6 +319,185 @@
     let pointLoads = [{ magnitude:10, position:10 }];
     let uniformLoads = [{ magnitude:1, start:0, end:20 }];
 
+    function clippedUniformMoment(load, x, leftOfLoad) {
+      const start = Math.max(0, load.start);
+      const end = Math.min(getSpan(), load.end);
+      if (end <= start) return 0;
+      const a = leftOfLoad ? 0 : start;
+      const b = leftOfLoad ? Math.min(x, end) : end;
+      if (b <= a) return 0;
+      if (leftOfLoad) {
+        return load.magnitude * (b - a) * x - load.magnitude * (b * b - a * a) / 2;
+      }
+      const low = Math.max(start, x);
+      if (end <= low) return 0;
+      return load.magnitude * (end - low) * (end + low - 2 * x) / 2;
+    }
+
+    function reactionAndExtrema() {
+      const span = getSpan();
+      const support = document.getElementById("supportSelect").value;
+      const totalPoint = pointLoads.reduce((sum, load) => sum + load.magnitude, 0);
+      const totalUniform = uniformLoads.reduce((sum, load) => {
+        const start = Math.max(0, load.start);
+        const end = Math.min(span, load.end);
+        return sum + load.magnitude * Math.max(0, end - start);
+      }, 0);
+      const total = totalPoint + totalUniform;
+      let leftReaction = 0;
+      let rightReaction = 0;
+      let fixedMoment = 0;
+
+      if (support === "Cantilever") {
+        leftReaction = total;
+        pointLoads.forEach(load => fixedMoment += load.magnitude * load.position);
+        uniformLoads.forEach(load => {
+          const start = Math.max(0, load.start);
+          const end = Math.min(span, load.end);
+          if (end > start) fixedMoment += load.magnitude * (end * end - start * start) / 2;
+        });
+      } else {
+        leftReaction = pointLoads.reduce((sum, load) => sum + load.magnitude * (span - load.position) / span, 0);
+        uniformLoads.forEach(load => {
+          const start = Math.max(0, load.start);
+          const end = Math.min(span, load.end);
+          if (end > start) {
+            leftReaction += load.magnitude * (span * (end - start) - (end * end - start * start) / 2) / span;
+          }
+        });
+        rightReaction = total - leftReaction;
+      }
+
+      const points = new Set([0, span]);
+      pointLoads.forEach(load => points.add(Math.max(0, Math.min(span, load.position))));
+      uniformLoads.forEach(load => {
+        points.add(Math.max(0, Math.min(span, load.start)));
+        points.add(Math.max(0, Math.min(span, load.end)));
+      });
+      for (let x = 0; x <= span + 0.001; x += 0.25) points.add(Math.round(x * 4) / 4);
+
+      let maxShear = { value:-Infinity, x:0 };
+      let maxMoment = { value:-Infinity, x:0 };
+      const xValues = Array.from(points).sort((a,b) => a-b);
+      xValues.forEach(x => {
+        let shear;
+        let moment;
+        if (support === "Cantilever") {
+          shear = pointLoads.reduce((sum, load) => sum + (load.position > x ? load.magnitude : 0), 0);
+          uniformLoads.forEach(load => {
+            const start = Math.max(0, load.start);
+            const end = Math.min(span, load.end);
+            if (end > x) shear += load.magnitude * (end - Math.max(start, x));
+          });
+          moment = -pointLoads.reduce((sum, load) => sum + (load.position > x ? load.magnitude * (load.position - x) : 0), 0);
+          uniformLoads.forEach(load => {
+            const start = Math.max(0, load.start);
+            const end = Math.min(span, load.end);
+            const low = Math.max(start, x);
+            if (end > low) {
+              moment -= load.magnitude * (end - low) * (end + low - 2 * x) / 2;
+            }
+          });
+        } else {
+          shear = leftReaction
+            - pointLoads.reduce((sum, load) => sum + (load.position <= x ? load.magnitude : 0), 0);
+          uniformLoads.forEach(load => {
+            const start = Math.max(0, load.start);
+            const end = Math.min(span, load.end);
+            const b = Math.min(x, end);
+            if (b > start) shear -= load.magnitude * (b - start);
+          });
+          moment = leftReaction * x
+            - pointLoads.reduce((sum, load) => sum + (load.position < x ? load.magnitude * (x - load.position) : 0), 0);
+          uniformLoads.forEach(load => {
+            const start = Math.max(0, load.start);
+            const end = Math.min(span, load.end);
+            const b = Math.min(x, end);
+            if (b > start) moment -= load.magnitude * (b - start) * (x - (start + b) / 2);
+          });
+        }
+        if (Math.abs(shear) > maxShear.value) maxShear = { value:Math.abs(shear), x };
+        if (Math.abs(moment) > maxMoment.value) maxMoment = { value:Math.abs(moment), x };
+      });
+
+      document.getElementById("leftReactionText").textContent = `${leftReaction.toFixed(1)} k`;
+      document.getElementById("rightReactionText").textContent =
+        support === "Cantilever" ? `-${fixedMoment.toFixed(1)} kip-ft` : `${rightReaction.toFixed(1)} k`;
+      drawShearAndMoment(support, span, leftReaction, maxShear, maxMoment);
+    }
+
+    function drawShearAndMoment(support, span, leftReaction, maxShear, maxMoment) {
+      const xValues = [];
+      for (let x = 0; x <= span + 0.001; x += 0.25) xValues.push(Math.round(x * 4) / 4);
+      const shearValues = xValues.map(x => {
+        if (support === "Cantilever") {
+          let v = pointLoads.reduce((sum, load) => sum + (load.position > x ? load.magnitude : 0), 0);
+          uniformLoads.forEach(load => {
+            const end = Math.min(span, load.end);
+            const start = Math.max(0, load.start);
+            if (end > x) v += load.magnitude * (end - Math.max(start, x));
+          });
+          return v;
+        }
+        let v = leftReaction - pointLoads.reduce((sum, load) => sum + (load.position <= x ? load.magnitude : 0), 0);
+        uniformLoads.forEach(load => {
+          const start = Math.max(0, load.start);
+          const end = Math.min(span, load.end);
+          const b = Math.min(x, end);
+          if (b > start) v -= load.magnitude * (b - start);
+        });
+        return v;
+      });
+      const momentValues = xValues.map(x => {
+        if (support === "Cantilever") {
+          let m = -pointLoads.reduce((sum, load) => sum + (load.position > x ? load.magnitude * (load.position - x) : 0), 0);
+          uniformLoads.forEach(load => {
+            const start = Math.max(0, load.start);
+            const end = Math.min(span, load.end);
+            const low = Math.max(start, x);
+            if (end > low) m -= load.magnitude * (end - low) * (end + low - 2 * x) / 2;
+          });
+          return m;
+        }
+        let m = leftReaction * x - pointLoads.reduce((sum, load) => sum + (load.position < x ? load.magnitude * (x - load.position) : 0), 0);
+        uniformLoads.forEach(load => {
+          const start = Math.max(0, load.start);
+          const end = Math.min(span, load.end);
+          const b = Math.min(x, end);
+          if (b > start) m -= load.magnitude * (b - start) * (x - (start + b) / 2);
+        });
+        return m;
+      });
+
+      const plotWidth = 740;
+      const plotPoints = values => values.map((value, i) => {
+        const x = i * plotWidth / Math.max(1, values.length - 1);
+        return [x, value];
+      });
+      const drawArea = (svg, values, color, fill, label, unit) => {
+        const absMax = Math.max(1, ...values.map(Math.abs));
+        const center = 48;
+        const scale = 34 / absMax;
+        const points = plotPoints(values);
+        const line = points.map(([x,value]) => `${x.toFixed(1)} ${(center-value*scale).toFixed(1)}`).join(" L");
+        const area = `M0 ${center} L${line} L${plotWidth} ${center} Z`;
+        const maxIndex = values.reduce((best, value, i) => Math.abs(value) > Math.abs(values[best]) ? i : best, 0);
+        const maxX = maxIndex * plotWidth / Math.max(1, values.length - 1);
+        const maxY = center - values[maxIndex] * scale;
+        svg.innerHTML = `<line x1="0" y1="${center}" x2="${plotWidth}" y2="${center}" stroke="#e4eaf2"/>
+          <path d="${area}" fill="${fill}" stroke="${color}" stroke-width="2"/>
+          <line x1="${maxX}" y1="${center}" x2="${maxX}" y2="${maxY}" stroke="${color}" stroke-dasharray="3 3"/>
+          <text x="${Math.min(plotWidth-8, maxX+8)}" y="${Math.max(12,maxY-5)}" fill="${color}" font-size="11" font-weight="800">${label(values[maxIndex])}</text>`;
+      };
+
+      drawArea(document.getElementById("shearPlot"), shearValues, "#2563eb", "#dbeafe",
+        value => `${value.toFixed(1)} ${unitFor(value)} max`, "k");
+      drawArea(document.getElementById("momentPlot"), momentValues, "#16a34a", "#dcfce7",
+        value => `${Math.abs(value).toFixed(1)} kip-ft at ${maxMoment.x.toFixed(2)} ft`, "");
+    }
+
+    function unitFor() { return "k"; }
+
     function getSpan() {
       return Math.max(4, Math.min(40, Number(spanNumber.value) || 20));
     }
@@ -334,6 +513,7 @@
       pointLoads.forEach(load => load.position = Math.min(load.position, span));
       renderLoads();
       updateMockPoint();
+      reactionAndExtrema();
     }
 
     spanRange.addEventListener("input", () => setSpan(spanRange.value));
@@ -437,6 +617,7 @@
           renderLoads();
         });
       });
+      reactionAndExtrema();
     }
 
     document.getElementById("addPoint").addEventListener("click", () => {
@@ -505,8 +686,11 @@
       if (mockPoint.hasPointerCapture(event.pointerId)) mockPoint.releasePointerCapture(event.pointerId);
     });
 
+    document.getElementById("supportSelect").addEventListener("change", reactionAndExtrema);
+
     renderLoads();
     updateMockPoint();
+    reactionAndExtrema();
   </script>
 </body>
 </html>
