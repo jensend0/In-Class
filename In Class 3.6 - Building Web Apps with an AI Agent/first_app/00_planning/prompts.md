@@ -15,3 +15,4 @@
 - 2026-11-20: Updated spec.md to add a Waste factor input of 0–15%, default 15%, and updated index.html with a matching percentage slider.
 - 2026-11-20: Added the save/share design feature to spec.md and index.html: named browser-local saves, saved-design loading, copyable URL links, and shared-state restoration.
 - 2026-11-20: Added the calculation report feature to spec.md and index.html, including a print-to-PDF action and a report containing inputs, loads, reactions, extrema, checks, and the section recommendation.
+- 2026-11-20: Published the existing web app to GitHub. The index.html file was already committed and tracked; confirmed the main branch is synchronized with origin/main.
