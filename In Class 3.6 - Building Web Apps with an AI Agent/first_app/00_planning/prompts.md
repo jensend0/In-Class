@@ -1,1 +1,2 @@
 - 2026-11-20: Commit the tagged AGENTS.md change. Added the session entry to this prompts log. The commit is being created and verified.
+- 2026-11-20: Commit the tagged spec.md change. Added the Beam Designer specification and this session entry to prompts.md. Commit created and verified successfully.
