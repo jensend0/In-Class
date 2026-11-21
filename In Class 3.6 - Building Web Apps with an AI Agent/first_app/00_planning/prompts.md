@@ -4,3 +4,7 @@
 - 2026-11-20: Reviewed only the Inputs section of spec.md, identified missing/default/range/control details, and clarified load defaults and limits with the user. No code or spec build changes were made.
 - 2026-11-20: Reviewed the Calculations section of spec.md for equations, units, undefined variables, and missing output calculations. No code or spec changes were made.
 - 2026-11-20: Addressed and moved the resolved input/calculation notes into spec.md, performed a whole-spec consistency review, and prepared the spec for commit.
+- 2026-11-20: Added six testable build stages to the end of spec.md under ## Build stages. No code was written or changed.
+- 2026-11-20: Built stage 1 as a single-file HTML/CSS/JavaScript mockup in index.html with placeholder inputs, beam drawing, plots, check cards, and section recommendation. No calculations were added.
+- 2026-11-20: Read the full Beam Designer spec in plan mode and proposed a 5-stage build sequence with test checks for each stage. No code or application files were changed.
+- 2026-11-20: Built stage 2: working span synchronization, load add/remove controls, validation, material/section defaults, deflection limit controls, and point-load dragging on the mock beam. No engineering calculations were added.

@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beam Designer</title>
+  <style>
+    :root {
+      --navy:#17324d; --blue:#2563eb; --blue-dark:#1d4ed8;
+      --green:#16a34a; --green-light:#dcfce7; --amber:#d97706;
+      --ink:#172033; --muted:#64748b; --line:#dbe3ed;
+      --canvas:#f4f7fb;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; min-height:100vh; color:var(--ink);
+      font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:var(--canvas);
+    }
+    button,input,select { font:inherit; }
+    .app-header {
+      height:68px; display:flex; align-items:center; padding:0 28px;
+      background:#fff; border-bottom:1px solid var(--line);
+    }
+    .brand {
+      display:flex; align-items:center; gap:10px; color:var(--navy);
+      font-size:20px; font-weight:750; letter-spacing:-0.02em;
+    }
+    .brand-mark {
+      width:32px; height:32px; display:grid; place-items:center;
+      border-radius:8px; background:var(--navy); color:#fff; font-size:16px;
+    }
+    .layout {
+      display:grid; grid-template-columns:320px minmax(0,1fr);
+      min-height:calc(100vh - 68px);
+    }
+    .sidebar {
+      height:calc(100vh - 68px); overflow-y:auto; padding:20px;
+      background:#fff; border-right:1px solid var(--line);
+    }
+    .main { min-width:0; padding:22px 24px 32px; }
+    .card,.check-card {
+      background:#fff; border:1px solid #e6ecf3; border-radius:12px;
+      box-shadow:0 3px 12px rgba(23,50,77,.055);
+    }
+    .sidebar .card { margin-bottom:12px; padding:14px; box-shadow:none; }
+    .card-title {
+      margin:0 0 12px; color:var(--navy); font-size:13px;
+      text-transform:uppercase; letter-spacing:.07em;
+    }
+    .field { margin-bottom:12px; }
+    .field:last-child { margin-bottom:0; }
+    .field-label {
+      display:flex; justify-content:space-between; margin-bottom:7px;
+      color:#44546a; font-size:12px; font-weight:700;
+    }
+    .field-label span:last-child { color:var(--muted); }
+    select,input[type="number"] {
+      width:100%; height:38px; border:1px solid #ccd7e4; border-radius:7px;
+      background:#fff; color:var(--ink); padding:0 10px; outline:none;
+    }
+    select:focus,input:focus {
+      border-color:var(--blue); box-shadow:0 0 0 3px #dbeafe;
+    }
+    .span-row {
+      display:grid; grid-template-columns:1fr 72px; gap:10px; align-items:center;
+    }
+    input[type="range"] { width:100%; accent-color:var(--blue); }
+    .load-card {
+      position:relative; margin-top:8px; padding:10px;
+      border:1px solid var(--line); border-radius:8px; background:#fbfdff;
+    }
+    .load-card-header {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:8px; color:var(--navy); font-size:12px; font-weight:800;
+    }
+    .icon-button {
+      width:24px; height:24px; border:0; border-radius:5px;
+      background:transparent; color:var(--muted); cursor:pointer;
+    }
+    .icon-button:hover { background:#edf2f7; color:#b91c1c; }
+    .input-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .mini-field label {
+      display:block; margin-bottom:4px; color:var(--muted);
+      font-size:10px; font-weight:700;
+    }
+    .mini-field input { height:34px; font-size:12px; }
+    .input-error { border-color:#dc2626 !important; background:#fff7f7 !important; }
+    .error-text { min-height:14px; margin-top:4px; color:#b91c1c; font-size:10px; }
+    .is-dragging { cursor:grabbing; }
+    .button-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .secondary-button {
+      height:36px; border:1px solid #b8c7da; border-radius:7px;
+      background:#fff; color:var(--navy); font-size:11px;
+      font-weight:800; cursor:pointer;
+    }
+    .secondary-button:hover { background:#f1f5f9; }
+    .radio-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .radio-choice {
+      display:flex; align-items:center; gap:7px; height:38px;
+      padding:0 9px; border:1px solid #ccd7e4; border-radius:7px;
+      font-size:12px; font-weight:700;
+    }
+    .radio-choice.selected { border-color:var(--blue); background:#eff6ff; }
+    .results { display:grid; gap:14px; }
+    .beam-card { padding:14px 18px 10px; }
+    .section-heading {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:4px;
+    }
+    .section-heading h2 {
+      margin:0; color:var(--navy); font-size:13px;
+      letter-spacing:.04em; text-transform:uppercase;
+    }
+    .status-pill {
+      padding:5px 9px; border-radius:999px; background:var(--green-light);
+      color:#15803d; font-size:10px; font-weight:850; letter-spacing:.04em;
+    }
+    .beam-svg { display:block; width:100%; height:128px; }
+    .plots-card { padding:8px 18px 12px; }
+    .plot {
+      display:grid; grid-template-columns:82px 1fr; align-items:center;
+      min-height:104px; border-bottom:1px solid #edf1f6;
+    }
+    .plot:last-child { border-bottom:0; }
+    .plot-label { color:var(--muted); font-size:11px; font-weight:800; }
+    .plot-label strong { display:block; color:var(--navy); font-size:13px; }
+    .plot svg { width:100%; height:96px; display:block; }
+    .check-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .check-card { padding:15px 16px; }
+    .check-top {
+      display:flex; justify-content:space-between; align-items:baseline;
+      margin-bottom:9px;
+    }
+    .check-name { color:var(--navy); font-size:14px; font-weight:800; }
+    .check-badge {
+      padding:5px 8px; border-radius:6px; background:var(--green-light);
+      color:#15803d; font-size:11px; font-weight:900;
+    }
+    .check-values { display:flex; gap:18px; margin-bottom:9px; }
+    .check-values div { color:var(--muted); font-size:11px; }
+    .check-values strong {
+      display:block; margin-top:2px; color:var(--ink); font-size:16px;
+    }
+    .bar { height:7px; overflow:hidden; border-radius:999px; background:#e8edf3; }
+    .bar-fill { height:100%; border-radius:999px; background:var(--green); }
+    .recommendation {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-top:14px; padding:12px 14px; border:1px solid #bdd8c4;
+      border-radius:10px; background:#f7fcf8; color:#3f4d45; font-size:12px;
+    }
+    .recommendation strong { color:var(--navy); }
+    .primary-button {
+      height:36px; padding:0 14px; border:0; border-radius:7px;
+      background:var(--blue); color:#fff; font-size:12px;
+      font-weight:800; cursor:pointer;
+    }
+    .primary-button:hover { background:var(--blue-dark); }
+    @media (max-width:820px) {
+      .layout { grid-template-columns:1fr; }
+      .sidebar {
+        height:auto; border-right:0; border-bottom:1px solid var(--line);
+      }
+      .main { padding:16px; }
+    }
+    @media (max-width:560px) {
+      .app-header { height:58px; padding:0 16px; }
+      .layout { min-height:calc(100vh - 58px); }
+      .sidebar { height:auto; padding:12px; }
+      .check-grid { grid-template-columns:1fr; }
+      .plot { grid-template-columns:68px 1fr; }
+      .recommendation { align-items:flex-start; gap:10px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand"><div class="brand-mark">B</div>Beam Designer</div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="card">
+        <h2 class="card-title">Beam</h2>
+        <div class="field">
+          <div class="field-label"><span>Support type</span></div>
+          <select>
+            <option selected>Simply supported</option>
+            <option>Cantilever</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Span</span><span>ft</span></div>
+          <div class="span-row">
+            <input id="spanRange" type="range" min="4" max="40" value="20">
+            <input id="spanNumber" type="number" min="4" max="40" value="20" aria-label="Span in feet">
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Loads</h2>
+        <div id="loadList"></div>
+        <div class="button-row" style="margin-top:9px">
+          <button id="addPoint" class="secondary-button" type="button">+ Point load</button>
+          <button id="addUniform" class="secondary-button" type="button">+ Uniform load</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Section</h2>
+        <div class="field">
+          <div class="field-label"><span>Material</span></div>
+          <select id="materialSelect"><option selected>Steel</option><option>Douglas Fir-Larch</option></select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Section</span></div>
+          <select id="sectionSelect"></select>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Deflection limit</span></div>
+          <div class="radio-row">
+            <label class="radio-choice"><input type="radio" name="limit"> L/240</label>
+            <label class="radio-choice selected"><input type="radio" name="limit" checked> L/360</label>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="results">
+        <section class="card beam-card">
+          <div class="section-heading">
+            <h2>Beam and reactions</h2><div class="status-pill">RESULTS READY</div>
+          </div>
+          <svg class="beam-svg" viewBox="0 0 900 128" role="img" aria-label="Beam with supports and loads">
+            <line x1="80" y1="58" x2="820" y2="58" stroke="#26384c" stroke-width="7" stroke-linecap="round"/>
+            <polygon points="68,58 92,58 80,43" fill="#2563eb"/>
+            <polygon points="808,58 832,58 820,43" fill="#2563eb"/>
+            <path d="M48 75h64M56 82h48M64 89h32M788 75h64M796 82h48M804 89h32" stroke="#64748b" stroke-width="3"/>
+            <g id="mockPointLoad" style="cursor:ew-resize">
+              <line id="mockPointLine" x1="450" y1="58" x2="450" y2="15" stroke="#2563eb" stroke-width="3"/>
+              <polygon id="mockPointHead" points="450,58 442,42 458,42" fill="#2563eb"/>
+              <text id="mockPointText" x="450" y="12" text-anchor="middle" fill="#2563eb" font-size="13" font-weight="700">10 k at 10 ft</text>
+            </g>
+            <line x1="80" y1="106" x2="820" y2="106" stroke="#b7c2cf"/>
+            <path d="M80 106l8-8 8 8M96 106l8-8 8 8M112 106l8-8 8 8M128 106l8-8 8 8M144 106l8-8 8 8M160 106l8-8 8 8M176 106l8-8 8 8M192 106l8-8 8 8M208 106l8-8 8 8M224 106l8-8 8 8M240 106l8-8 8 8M256 106l8-8 8 8M272 106l8-8 8 8M288 106l8-8 8 8M304 106l8-8 8 8M320 106l8-8 8 8M336 106l8-8 8 8M352 106l8-8 8 8M368 106l8-8 8 8M384 106l8-8 8 8M400 106l8-8 8 8M416 106l8-8 8 8M432 106l8-8 8 8M448 106l8-8 8 8M464 106l8-8 8 8M480 106l8-8 8 8M496 106l8-8 8 8M512 106l8-8 8 8M528 106l8-8 8 8M544 106l8-8 8 8M560 106l8-8 8 8M576 106l8-8 8 8M592 106l8-8 8 8M608 106l8-8 8 8M624 106l8-8 8 8M640 106l8-8 8 8M656 106l8-8 8 8M672 106l8-8 8 8M688 106l8-8 8 8M704 106l8-8 8 8M720 106l8-8 8 8M736 106l8-8 8 8M752 106l8-8 8 8M768 106l8-8 8 8M784 106l8-8 8 8M800 106l8-8 8 8" stroke="#2563eb" stroke-width="2" fill="none"/>
+            <line x1="80" y1="58" x2="80" y2="34" stroke="#16a34a" stroke-width="3"/><polygon points="80,58 72,40 88,40" fill="#16a34a"/>
+            <text x="80" y="28" text-anchor="middle" fill="#15803d" font-size="12" font-weight="800">10.0 k</text>
+            <line x1="820" y1="58" x2="820" y2="34" stroke="#16a34a" stroke-width="3"/><polygon points="820,58 812,40 828,40" fill="#16a34a"/>
+            <text x="820" y="28" text-anchor="middle" fill="#15803d" font-size="12" font-weight="800">10.0 k</text>
+            <text x="80" y="122" fill="#64748b" font-size="11">0 ft</text><text x="450" y="122" text-anchor="middle" fill="#64748b" font-size="11">10 ft</text><text x="820" y="122" text-anchor="end" fill="#64748b" font-size="11">20 ft</text>
+          </svg>
+        </section>
+
+        <section class="card plots-card">
+          <div class="plot">
+            <div class="plot-label"><strong>Shear</strong>kips</div>
+            <svg viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Placeholder shear diagram">
+              <line x1="0" y1="48" x2="740" y2="48" stroke="#e4eaf2"/>
+              <path d="M0 48H20V20H720V48H740V76Z" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+              <line x1="20" y1="48" x2="20" y2="20" stroke="#2563eb" stroke-dasharray="3 3"/>
+              <text x="31" y="16" fill="#2563eb" font-size="11" font-weight="800">10.0 k max</text>
+              <line x1="720" y1="48" x2="720" y2="76" stroke="#2563eb" stroke-dasharray="3 3"/>
+              <text x="712" y="91" text-anchor="end" fill="#64748b" font-size="10">-10.0 k</text>
+            </svg>
+          </div>
+          <div class="plot">
+            <div class="plot-label"><strong>Moment</strong>kip-ft</div>
+            <svg viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Placeholder moment diagram">
+              <line x1="0" y1="76" x2="740" y2="76" stroke="#e4eaf2"/>
+              <path d="M0 76L370 10L740 76Z" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+              <line x1="370" y1="10" x2="370" y2="76" stroke="#16a34a" stroke-dasharray="3 3"/>
+              <text x="370" y="6" text-anchor="middle" fill="#15803d" font-size="11" font-weight="800">50.0 kip-ft at 10 ft</text>
+            </svg>
+          </div>
+          <div class="plot">
+            <div class="plot-label"><strong>Deflection</strong>in</div>
+            <svg viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Placeholder deflected shape">
+              <line x1="0" y1="18" x2="740" y2="18" stroke="#e4eaf2"/>
+              <path d="M0 18C180 18 260 78 370 78C480 78 560 18 740 18" fill="none" stroke="#d97706" stroke-width="3"/>
+              <line x1="370" y1="18" x2="370" y2="78" stroke="#d97706" stroke-dasharray="3 3"/>
+              <text x="370" y="92" text-anchor="middle" fill="#b45309" font-size="11" font-weight="800">0.609 in at 10 ft</text>
+            </svg>
+          </div>
+        </section>
+
+        <section class="check-grid">
+          <article class="check-card" title="fb = |M max| × 12 / Sx">
+            <div class="check-top"><div class="check-name">Bending</div><div class="check-badge">PASS</div></div>
+            <div class="check-values">
+              <div>Actual<strong>17.96 ksi</strong></div>
+              <div>Allowable<strong>30.00 ksi</strong></div>
+              <div>Ratio<strong>59.9%</strong></div>
+            </div>
+            <div class="bar"><div class="bar-fill" style="width:59.9%"></div></div>
+          </article>
+          <article class="check-card" title="Deflection limit = L/360; y max is the maximum absolute deflection">
+            <div class="check-top"><div class="check-name">Deflection</div><div class="check-badge">PASS</div></div>
+            <div class="check-values">
+              <div>Actual<strong>0.609 in</strong></div>
+              <div>Allowable<strong>0.667 in</strong></div>
+              <div>Ratio<strong>91.3%</strong></div>
+            </div>
+            <div class="bar"><div class="bar-fill" style="width:91.3%;background:#d97706"></div></div>
+          </article>
+        </section>
+
+        <section class="recommendation">
+          <div>Lightest passing section: <strong>W12x26</strong> · 26 lb/ft · both checks pass</div>
+          <button class="primary-button">Use W12x26</button>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script>
+    const spanRange = document.getElementById("spanRange");
+    const spanNumber = document.getElementById("spanNumber");
+    const loadList = document.getElementById("loadList");
+    let pointLoads = [{ magnitude:10, position:10 }];
+    let uniformLoads = [{ magnitude:1, start:0, end:20 }];
+
+    function getSpan() {
+      return Math.max(4, Math.min(40, Number(spanNumber.value) || 20));
+    }
+
+    function setSpan(value) {
+      const span = Math.max(4, Math.min(40, Number(value) || 20));
+      spanRange.value = span;
+      spanNumber.value = span;
+      uniformLoads.forEach(load => {
+        load.start = Math.min(load.start, span);
+        load.end = Math.min(load.end, span);
+      });
+      pointLoads.forEach(load => load.position = Math.min(load.position, span));
+      renderLoads();
+      updateMockPoint();
+    }
+
+    spanRange.addEventListener("input", () => setSpan(spanRange.value));
+    spanNumber.addEventListener("change", () => setSpan(spanNumber.value));
+
+    function validateMagnitude(input, max) {
+      const value = Number(input.value);
+      const valid = input.value !== "" && value >= 0 && value <= max;
+      input.classList.toggle("input-error", !valid);
+      const error = input.closest(".mini-field").querySelector(".error-text");
+      if (error) error.textContent = valid ? "" : `Enter 0 to ${max}.`;
+    }
+
+    function validatePosition(input) {
+      const value = Number(input.value);
+      const span = getSpan();
+      const valid = input.value !== "" && value >= 0 && value <= span && Math.abs(value * 4 - Math.round(value * 4)) < 0.0001;
+      input.classList.toggle("input-error", !valid);
+      const error = input.closest(".mini-field").querySelector(".error-text");
+      if (error) error.textContent = valid ? "" : `Enter 0 to ${span} ft in 0.25-ft steps.`;
+    }
+
+    function loadField(label, unit, value, max, position, index, key) {
+      return `<div class="mini-field">
+        <label>${label} · ${unit}</label>
+        <input type="number" value="${value}" min="0" max="${max}" step="${position ? "0.25" : "0.05"}"
+          data-index="${index}" data-key="${key}" ${position ? 'data-position="true"' : ""}>
+        <div class="error-text"></div>
+      </div>`;
+    }
+
+    function renderLoads() {
+      loadList.innerHTML = "";
+
+      pointLoads.forEach((load, index) => {
+        const card = document.createElement("div");
+        card.className = "load-card";
+        card.innerHTML = `<div class="load-card-header"><span>Point Load ${index + 1}</span>
+          <button class="icon-button" type="button" data-remove-point="${index}" aria-label="Remove point load ${index + 1}">×</button></div>
+          <div class="input-grid">
+            ${loadField("Magnitude", "kips", load.magnitude, 100, false, index, "magnitude")}
+            ${loadField("Position", "ft", load.position, getSpan(), true, index, "position")}
+          </div>`;
+        loadList.appendChild(card);
+      });
+
+      uniformLoads.forEach((load, index) => {
+        const card = document.createElement("div");
+        card.className = "load-card";
+        card.innerHTML = `<div class="load-card-header"><span>Uniform Load ${index + 1}</span>
+          <button class="icon-button" type="button" data-remove-uniform="${index}" aria-label="Remove uniform load ${index + 1}">×</button></div>
+          <div class="input-grid">
+            ${loadField("Magnitude", "kip/ft", load.magnitude, 10, false, index, "magnitude")}
+            ${loadField("Start", "ft", load.start, getSpan(), true, index, "start")}
+            ${loadField("End", "ft", load.end, getSpan(), true, index, "end")}
+          </div>`;
+        loadList.appendChild(card);
+      });
+
+      loadList.querySelectorAll("input").forEach(input => {
+        const index = Number(input.dataset.index);
+        const key = input.dataset.key;
+        const isPoint = input.closest(".load-card").querySelector("[data-remove-point]") !== null;
+        input.addEventListener("input", () => {
+          if (input.dataset.position) {
+            validatePosition(input);
+          } else {
+            validateMagnitude(input, isPoint ? 100 : 10);
+          }
+        });
+        input.addEventListener("change", () => {
+          let value = Number(input.value);
+          if (input.dataset.position) {
+            value = Math.max(0, Math.min(getSpan(), value));
+            value = Math.round(value * 4) / 4;
+          } else {
+            value = Math.max(0, Math.min(isPoint ? 100 : 10, value));
+          }
+          input.value = value;
+          if (isPoint) pointLoads[index][key] = value;
+          else uniformLoads[index][key] = value;
+          if (!isPoint && key === "start" && uniformLoads[index].end < value) uniformLoads[index].end = value;
+          if (!isPoint && key === "end" && uniformLoads[index].start > value) uniformLoads[index].start = value;
+          renderLoads();
+          updateMockPoint();
+        });
+        if (input.dataset.position) validatePosition(input);
+        else validateMagnitude(input, isPoint ? 100 : 10);
+      });
+
+      loadList.querySelectorAll("[data-remove-point]").forEach(button => {
+        button.addEventListener("click", () => {
+          pointLoads.splice(Number(button.dataset.removePoint), 1);
+          renderLoads();
+          updateMockPoint();
+        });
+      });
+      loadList.querySelectorAll("[data-remove-uniform]").forEach(button => {
+        button.addEventListener("click", () => {
+          uniformLoads.splice(Number(button.dataset.removeUniform), 1);
+          renderLoads();
+        });
+      });
+    }
+
+    document.getElementById("addPoint").addEventListener("click", () => {
+      pointLoads.push({ magnitude:1, position: getSpan() / 2 });
+      renderLoads();
+      updateMockPoint();
+    });
+    document.getElementById("addUniform").addEventListener("click", () => {
+      uniformLoads.push({ magnitude:1, start:0, end:getSpan() });
+      renderLoads();
+    });
+
+    const steelSections=["W12x26","W8x10","W10x12","W14x22","W16x26","W18x35","W21x44","W24x55"];
+    const lumberSections=["2x8","2x10","2x12"];
+    const materialSelect=document.getElementById("materialSelect");
+    const sectionSelect=document.getElementById("sectionSelect");
+    function updateSections(defaultValue) {
+      const options = materialSelect.value === "Steel" ? steelSections : lumberSections;
+      sectionSelect.innerHTML = options.map(section => `<option${section === defaultValue ? " selected" : ""}>${section}</option>`).join("");
+    }
+    updateSections("W12x26");
+    materialSelect.addEventListener("change", () => updateSections(materialSelect.value === "Steel" ? "W12x26" : "2x8"));
+
+    document.querySelectorAll("input[name='limit']").forEach(input => {
+      input.addEventListener("change", () => {
+        document.querySelectorAll(".radio-choice").forEach(label => label.classList.remove("selected"));
+        input.closest(".radio-choice").classList.add("selected");
+      });
+    });
+
+    function updateMockPoint() {
+      const first = pointLoads[0];
+      if (!first) {
+        document.getElementById("mockPointLoad").style.display = "none";
+        return;
+      }
+      document.getElementById("mockPointLoad").style.display = "";
+      const x = 80 + (first.position / getSpan()) * 740;
+      const line=document.getElementById("mockPointLine");
+      const head=document.getElementById("mockPointHead");
+      const text=document.getElementById("mockPointText");
+      line.setAttribute("x1",x); line.setAttribute("x2",x);
+      head.setAttribute("points",`${x},58 ${x-8},42 ${x+8},42`);
+      text.setAttribute("x",x);
+      text.textContent=`${first.magnitude} k at ${first.position} ft`;
+    }
+
+    const mockPoint=document.getElementById("mockPointLoad");
+    mockPoint.addEventListener("pointerdown", event => {
+      if (!pointLoads[0]) return;
+      mockPoint.setPointerCapture(event.pointerId);
+      mockPoint.classList.add("is-dragging");
+    });
+    mockPoint.addEventListener("pointermove", event => {
+      if (!mockPoint.hasPointerCapture(event.pointerId) || !pointLoads[0]) return;
+      const svg=mockPoint.ownerSVGElement;
+      const rect=svg.getBoundingClientRect();
+      const svgX=(event.clientX-rect.left)/rect.width*900;
+      const position=Math.round(Math.max(0,Math.min(getSpan(),(svgX-80)/740*getSpan))*4)/4;
+      pointLoads[0].position=position;
+      renderLoads();
+      updateMockPoint();
+    });
+    mockPoint.addEventListener("pointerup", event => {
+      mockPoint.classList.remove("is-dragging");
+      if (mockPoint.hasPointerCapture(event.pointerId)) mockPoint.releasePointerCapture(event.pointerId);
+    });
+
+    renderLoads();
+    updateMockPoint();
+  </script>
+</body>
+</html>
