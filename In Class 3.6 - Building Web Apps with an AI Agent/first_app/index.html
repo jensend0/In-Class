@@ -22,9 +22,12 @@
       outline:3px solid #93c5fd; outline-offset:2px;
     }
     .app-header {
-      height:68px; display:flex; align-items:center; padding:0 28px;
+      height:68px; display:flex; align-items:center; justify-content:space-between; padding:0 28px;
       background:#fff; border-bottom:1px solid var(--line);
     }
+    .header-actions { display:flex; align-items:center; gap:8px; }
+    .design-status { min-width:130px; color:var(--muted); text-align:right; font-size:11px; }
+    .print-report { display:none; }
     .brand {
       display:flex; align-items:center; gap:10px; color:var(--navy);
       font-size:20px; font-weight:750; letter-spacing:-0.02em;
@@ -182,16 +185,46 @@
       .plot { grid-template-columns:68px 1fr; }
       .recommendation { align-items:flex-start; gap:10px; }
     }
+    @media print {
+      body { background:#fff; }
+      .app-header, .layout { display:none !important; }
+      .print-report {
+        display:block; max-width:8.5in; margin:0 auto; color:#111827;
+        font-family:Arial,sans-serif; font-size:11pt;
+      }
+      .print-report h1 { margin:0 0 6px; font-size:20pt; }
+      .print-report h2 { margin:18px 0 6px; font-size:14pt; }
+      .print-report table { width:100%; border-collapse:collapse; }
+      .print-report th, .print-report td {
+        border:1px solid #9ca3af; padding:5px 7px; text-align:left;
+      }
+      .print-report th { background:#f3f4f6; }
+    }
   </style>
 </head>
 <body>
   <header class="app-header">
     <div class="brand"><div class="brand-mark">B</div>Beam Designer</div>
+    <div class="header-actions">
+      <div id="designStatus" class="design-status" role="status" aria-live="polite"></div>
+      <button id="saveDesign" class="secondary-button" type="button">Save design</button>
+      <button id="shareDesign" class="primary-button" type="button">Copy share link</button>
+      <button id="printReportButton" class="secondary-button" type="button">Print report</button>
+    </div>
   </header>
+  <section id="printReport" class="print-report" aria-hidden="true"></section>
   <div class="layout">
     <aside class="sidebar">
       <section class="card">
         <h2 class="card-title">Beam</h2>
+        <div class="field">
+          <div class="field-label"><span>Design name</span></div>
+          <input id="designName" type="text" value="Untitled beam" aria-label="Design name">
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Saved designs</span></div>
+          <select id="savedDesigns" aria-label="Saved designs"><option value="">No saved designs</option></select>
+        </div>
         <div class="field">
           <div class="field-label"><span>Support type</span></div>
           <select id="supportSelect" aria-label="Support type">
@@ -233,6 +266,10 @@
             <label class="radio-choice"><input type="radio" name="limit"> L/240</label>
             <label class="radio-choice selected"><input type="radio" name="limit" checked> L/360</label>
           </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span>Waste factor</span><span id="wasteValue">15%</span></div>
+          <input id="wasteFactor" type="range" min="0" max="15" value="15" step="1" aria-label="Waste factor percentage">
         </div>
       </section>
     </aside>
@@ -509,7 +546,7 @@
         value => `${value.toFixed(1)} ${unitFor(value)} max`, "k");
       drawArea(document.getElementById("momentPlot"), momentValues, "#16a34a", "#dcfce7",
         value => `${Math.abs(value).toFixed(1)} kip-ft at ${maxMoment.x.toFixed(2)} ft`, "");
-      reactionAndDeflectionContext = { support, span, leftReaction, maxMoment };
+      reactionAndDeflectionContext = { support, span, leftReaction, maxMoment, maxShear };
     }
 
     function unitFor() { return "k"; }
@@ -617,6 +654,10 @@
         text.textContent="No passing section";
         button.style.display="none";
       }
+      updateCalculationReport({
+        bending,bendingRatio,Fb,actualDeflection,deflectionRatio,
+        allowableDeflection,limitText,recommendation
+      });
     }
 
     function setCheck(kind,actual,ratio,allowable,unit) {
@@ -634,6 +675,50 @@
       if(ratio<0.7) { bar.style.background="#16a34a"; }
       else if(ratio<=1) { bar.style.background="#d97706"; }
       else { bar.style.background="#dc2626"; }
+    }
+
+    function updateCalculationReport(values) {
+      const context=reactionAndDeflectionContext;
+      if(!context) return;
+      const pointRows=pointLoads.map((load,index)=>
+        `<tr><td>Point ${index+1}</td><td>${load.magnitude} kips</td><td>${load.position} ft</td></tr>`
+      ).join("");
+      const uniformRows=uniformLoads.map((load,index)=>
+        `<tr><td>Uniform ${index+1}</td><td>${load.magnitude} kip/ft</td><td>${load.start}–${load.end} ft</td></tr>`
+      ).join("");
+      const recommendation=values.recommendation
+        ? escapeHtml(values.recommendation.name)
+        : "No passing section";
+      document.getElementById("printReport").innerHTML=`
+        <h1>Beam Designer Calculation Report</h1>
+        <p><strong>Design:</strong> ${escapeHtml(designName.value.trim()||"Untitled beam")}<br>
+        <strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+        <h2>Inputs</h2>
+        <table>
+          <tr><th>Support</th><td>${escapeHtml(context.support)}</td></tr>
+          <tr><th>Span</th><td>${context.span} ft</td></tr>
+          <tr><th>Material</th><td>${escapeHtml(materialSelect.value)}</td></tr>
+          <tr><th>Section</th><td>${escapeHtml(sectionSelect.value)}</td></tr>
+          <tr><th>Deflection limit</th><td>${escapeHtml(values.limitText)}</td></tr>
+          <tr><th>Waste factor</th><td>${wasteFactor.value}%</td></tr>
+        </table>
+        <h2>Loads</h2>
+        <table>
+          <tr><th>Load</th><th>Magnitude</th><th>Position / range</th></tr>
+          ${pointRows||'<tr><td>Point</td><td>None</td><td>—</td></tr>'}
+          ${uniformRows||'<tr><td>Uniform</td><td>None</td><td>—</td></tr>'}
+        </table>
+        <h2>Results</h2>
+        <table>
+          <tr><th>Left reaction</th><td>${document.getElementById("leftReactionText").textContent}</td></tr>
+          <tr><th>Right / fixed reaction</th><td>${document.getElementById("rightReactionText").textContent}</td></tr>
+          <tr><th>Maximum shear</th><td>${context.maxShear.value.toFixed(2)} kips at ${context.maxShear.x.toFixed(2)} ft</td></tr>
+          <tr><th>Maximum moment</th><td>${context.maxMoment.value.toFixed(2)} kip-ft at ${context.maxMoment.x.toFixed(2)} ft</td></tr>
+          <tr><th>Maximum deflection</th><td>${Math.abs(context.maxDeflection?.y||0).toFixed(3)} in at ${(context.maxDeflection?.x||0).toFixed(2)} ft</td></tr>
+          <tr><th>Bending stress</th><td>${values.bending.toFixed(2)} ksi / ${values.Fb.toFixed(3)} ksi (${(values.bendingRatio*100).toFixed(1)}%) — ${values.bendingRatio<=1?"PASS":"FAIL"}</td></tr>
+          <tr><th>Deflection</th><td>${(Math.abs(context.maxDeflection?.y||0)).toFixed(3)} in / ${values.allowableDeflection.toFixed(3)} in (${(values.deflectionRatio*100).toFixed(1)}%) — ${values.deflectionRatio<=1?"PASS":"FAIL"}</td></tr>
+          <tr><th>Section recommendation</th><td>${recommendation}</td></tr>
+        </table>`;
     }
 
     function calculateDeflection() {
@@ -771,6 +856,16 @@
       renderLoads();
       updateMockPoint();
       reactionAndExtrema();
+      refreshSavedDesigns();
+
+      if(location.hash.startsWith("#beam=")) {
+        try {
+          applyDesignState(decodeShareState(location.hash.slice("#beam=".length)));
+          showDesignStatus("Shared design restored");
+        } catch (_) {
+          showDesignStatus("Invalid shared design");
+        }
+      }
       setupPlotHover();
     }
 
@@ -908,7 +1003,8 @@
     const sectionSelect=document.getElementById("sectionSelect");
     function updateSections(defaultValue) {
       const options = materialSelect.value === "Steel" ? steelSections : lumberSections;
-      sectionSelect.innerHTML = options.map(section => `<option${section === defaultValue ? " selected" : ""}>${section}</option>`).join("");
+      const selected=options.includes(defaultValue)?defaultValue:options[0];
+      sectionSelect.innerHTML = options.map(section => `<option${section === selected ? " selected" : ""}>${section}</option>`).join("");
     }
     updateSections("W12x26");
     materialSelect.addEventListener("change", () => {
@@ -923,6 +1019,140 @@
         input.closest(".radio-choice").classList.add("selected");
         reactionAndExtrema();
       });
+    });
+
+    const wasteFactor=document.getElementById("wasteFactor");
+    const wasteValue=document.getElementById("wasteValue");
+    wasteFactor.addEventListener("input",()=>{
+      wasteValue.textContent=`${wasteFactor.value}%`;
+    });
+
+    const designName=document.getElementById("designName");
+    const savedDesigns=document.getElementById("savedDesigns");
+    const designStatus=document.getElementById("designStatus");
+    const savedDesignKey="beam-designer-saved-designs";
+
+    function getDesignState() {
+      const checkedLimit=document.querySelector("input[name='limit']:checked");
+      return {
+        name:(designName.value.trim()||"Untitled beam"),
+        support:document.getElementById("supportSelect").value,
+        span:getSpan(),
+        pointLoads:pointLoads.map(load=>({...load})),
+        uniformLoads:uniformLoads.map(load=>({...load})),
+        material:materialSelect.value,
+        section:sectionSelect.value,
+        deflectionLimit:checkedLimit.parentElement.textContent.trim(),
+        wasteFactor:Number(wasteFactor.value)
+      };
+    }
+
+    function applyDesignState(state) {
+      if(!state || typeof state !== "object") throw new Error("Invalid design");
+      designName.value=state.name||"Untitled beam";
+      document.getElementById("supportSelect").value=state.support==="Cantilever"?"Cantilever":"Simply supported";
+      setSpan(state.span||20);
+      pointLoads=Array.isArray(state.pointLoads)?state.pointLoads.map(load=>({
+        magnitude:Number(load.magnitude)||0,
+        position:Math.max(0,Math.min(getSpan(),Number(load.position)||0))
+      })):[];
+      uniformLoads=Array.isArray(state.uniformLoads)?state.uniformLoads.map(load=>({
+        magnitude:Number(load.magnitude)||0,
+        start:Math.max(0,Math.min(getSpan(),Number(load.start)||0)),
+        end:Math.max(0,Math.min(getSpan(),Number(load.end)||getSpan()))
+      })):[];
+      materialSelect.value=state.material==="Douglas Fir-Larch"?"Douglas Fir-Larch":"Steel";
+      updateSections(state.section);
+      const limit240=state.deflectionLimit==="L/240";
+      document.querySelectorAll("input[name='limit']").forEach(input=>{
+        input.checked=limit240?input.parentElement.textContent.includes("240"):input.parentElement.textContent.includes("360");
+        input.closest(".radio-choice").classList.toggle("selected",input.checked);
+      });
+      wasteFactor.value=Math.max(0,Math.min(15,Number(state.wasteFactor)||0));
+      wasteValue.textContent=`${wasteFactor.value}%`;
+      renderLoads();
+      updateMockPoint();
+      reactionAndExtrema();
+    }
+
+    function showDesignStatus(message) {
+      designStatus.textContent=message;
+      window.clearTimeout(showDesignStatus.timer);
+      showDesignStatus.timer=window.setTimeout(()=>designStatus.textContent="",3500);
+    }
+
+    function readSavedDesigns() {
+      try {
+        return JSON.parse(localStorage.getItem(savedDesignKey)||"[]");
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function refreshSavedDesigns(selectedName) {
+      const designs=readSavedDesigns();
+      if(designs.length===0) {
+        savedDesigns.innerHTML='<option value="">No saved designs</option>';
+        return;
+      }
+      savedDesigns.innerHTML='<option value="">Select a saved design</option>'+
+        designs.map(design=>`<option value="${escapeHtml(design.name)}"${design.name===selectedName?" selected":""}>${escapeHtml(design.name)}</option>`).join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+    }
+
+    document.getElementById("saveDesign").addEventListener("click",()=>{
+      const state=getDesignState();
+      let designs=readSavedDesigns();
+      const existing=designs.findIndex(design=>design.name===state.name);
+      if(existing>=0) designs[existing]=state;
+      else designs=[...designs,state].slice(-20);
+      try {
+        localStorage.setItem(savedDesignKey,JSON.stringify(designs));
+        refreshSavedDesigns(state.name);
+        showDesignStatus(`Saved "${state.name}"`);
+      } catch (_) {
+        showDesignStatus("Could not save design");
+      }
+    });
+
+    savedDesigns.addEventListener("change",()=>{
+      if(!savedDesigns.value) return;
+      const design=readSavedDesigns().find(item=>item.name===savedDesigns.value);
+      if(design) {
+        applyDesignState(design);
+        showDesignStatus(`Loaded "${design.name}"`);
+      }
+    });
+
+    function encodeShareState(state) {
+      const json=JSON.stringify(state);
+      return btoa(unescape(encodeURIComponent(json))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+    }
+
+    function decodeShareState(encoded) {
+      const base64=encoded.replace(/-/g,"+").replace(/_/g,"/");
+      const padded=base64+"=".repeat((4-base64.length%4)%4);
+      return JSON.parse(decodeURIComponent(escape(atob(padded))));
+    }
+
+    document.getElementById("shareDesign").addEventListener("click",async()=>{
+      const url=new URL(window.location.href);
+      url.hash=`beam=${encodeShareState(getDesignState())}`;
+      try {
+        await navigator.clipboard.writeText(url.toString());
+        showDesignStatus("Share link copied");
+      } catch (_) {
+        window.prompt("Copy this share link:",url.toString());
+        showDesignStatus("Share link ready");
+      }
+    });
+
+    document.getElementById("printReportButton").addEventListener("click",()=>{
+      updateChecks();
+      window.print();
     });
 
     function updateMockPoint() {

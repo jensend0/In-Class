@@ -11,6 +11,8 @@ A civil engineering student checking a homework beam, or an engineer
 sizing a floor beam or deck joist.
 
 ## Inputs
+- Design name: optional text field, default "Untitled beam". Used to label
+  designs saved in the browser.
 - Support type: dropdown with Simply supported (default) or Cantilever
   (fixed at the left end).
 - Span: 4 to 40 ft, default 20 ft, set with a slider and number box that
@@ -59,6 +61,9 @@ sizing a floor beam or deck joist.
   | 2x12    | 177.98    | 31.64     |
 
 - Deflection limit: radio or dropdown with L/240 and L/360; default L/360.
+- Waste factor: slider from 0% to 15%, default 15%. Display the selected
+  percentage beside the slider; no waste-factor calculation is currently
+  included in beam design checks.
 - Self-weight is ignored.
 
 ## Calculations
@@ -109,6 +114,18 @@ sizing a floor beam or deck joist.
   in inches for deflection limits, and EI is in ksi-in^4 for deflection.
 
 ## Outputs
+- Save design: save or update a named design in browser local storage.
+  Saved designs can be selected and loaded from the app.
+- Share design: copy a shareable URL that restores the complete beam
+  configuration, including loads, support, section, deflection limit, and
+  waste factor.
+- Design status: briefly confirm successful save, copy, load, or restore
+  actions and report an invalid shared URL.
+- Calculation report: a Print Report action opens the browser print dialog,
+  allowing the user to print or save a PDF. The report includes the design
+  name, all entered inputs, reactions, maximum shear and moment, maximum
+  deflection, bending stress, allowable stress, deflection limit, pass/fail
+  statuses, and the current section recommendation.
 - A beam drawing with the supports, load arrows (point loads as single
   arrows, uniform loads as a row of small arrows), and the reactions.
 - Three diagrams stacked under the beam and lined up with it on the same
@@ -151,7 +168,6 @@ sizing a floor beam or deck joist.
 ## Out of scope
 - Self-weight, shear stress, lateral-torsional buckling, load
   combinations, and continuous beams.
-- Saving designs.
 
 ## Resolved notes
 - Support type defaults to Simply supported and uses a dropdown.
@@ -174,3 +190,57 @@ sizing a floor beam or deck joist.
 - Check-card ratios are fb/Fb and |y max|/allowable deflection.
 - If no section passes, the app displays "No passing section" and offers no
   use-section action.
+
+## Build stages
+
+### 1. Build the page layout mockup
+Create the left input panel and right results area with placeholder beam,
+diagrams, cards, and section recommendation. Preload the example values
+visually.
+
+Test: The desktop layout matches the spec, the panels stack correctly on a
+phone, and the example values appear without any calculations running.
+
+### 2. Add working inputs and load management
+Implement support, span, loads, material/section, and deflection-limit
+controls. Include validation, removing loads, adding loads, and point-load
+dragging.
+
+Test: Span slider and number box stay synchronized; load values remain within
+range; dragging snaps to 0.25 ft; invalid values show inline errors; and
+switching materials selects the correct default section.
+
+### 3. Implement reactions, shear, and moment
+Add statics calculations and calculate shear and moment at exact load
+boundaries. Render the beam and shear/moment diagrams from real values.
+
+Test: Use the four validation cases, especially the 20-ft uniform load and
+10-kip point load. Confirm reaction values, maximum shear, and maximum
+moment locations.
+
+### 4. Add deflection and diagram interactions
+Integrate moment twice for each support type and calculate deflection in
+inches. Add the deflected-shape diagram and synchronized hover cursor across
+all diagrams.
+
+Test: The full-span uniform-load deflection is about 0.609 in, the cantilever
+gives 0.487 in for the prescribed example, and hovering returns values on
+the same beam position for every diagram.
+
+### 5. Add checks and section recommendation
+Calculate bending stress, deflection ratios, PASS/FAIL states, check-card
+colors, and the lightest passing section. Add the button that applies the
+recommendation.
+
+Test: The example cases pass or fail as listed; ratios and card colors update
+immediately; lumber and steel recommendations follow the specified rules;
+and a case with no passing section shows "No passing section" without a use
+button.
+
+### 6. Polish and verify the complete app
+Finish responsive styling, formula hover explanations, maximum-value labels,
+accessibility, and any remaining visual details.
+
+Test: Test every validation case again, resize from desktop to phone, use
+keyboard controls, and confirm that every input change updates the whole
+results area immediately.

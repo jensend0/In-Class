@@ -12,3 +12,6 @@
 - 2026-11-20: Built stage 4: numerical deflection integration, a real deflected-shape plot, and synchronized hover readouts across shear, moment, and deflection plots. Check cards remain placeholders.
 - 2026-11-20: Built stage 5: live bending and deflection checks, PASS/FAIL ratios and bar colors, lightest passing section selection, and use-section behavior. No stage 6 polish remains.
 - 2026-11-20: Built stage 6: immediate input updates, keyboard/focus styling, accessible control labels and live status, formula help, and final responsive polish.
+- 2026-11-20: Updated spec.md to add a Waste factor input of 0–15%, default 15%, and updated index.html with a matching percentage slider.
+- 2026-11-20: Added the save/share design feature to spec.md and index.html: named browser-local saves, saved-design loading, copyable URL links, and shared-state restoration.
+- 2026-11-20: Added the calculation report feature to spec.md and index.html, including a print-to-PDF action and a report containing inputs, loads, reactions, extrema, checks, and the section recommendation.
