@@ -126,6 +126,14 @@
     .plot-label { color:var(--muted); font-size:11px; font-weight:800; }
     .plot-label strong { display:block; color:var(--navy); font-size:13px; }
     .plot svg { width:100%; height:96px; display:block; }
+    .plot { position:relative; }
+    .hover-readout {
+      display:none; position:absolute; right:8px; top:4px; z-index:2;
+      padding:5px 7px; border:1px solid #cbd5e1; border-radius:6px;
+      background:rgba(255,255,255,.96); color:var(--navy);
+      font-size:10px; font-weight:800; white-space:nowrap;
+      box-shadow:0 2px 8px rgba(15,23,42,.08);
+    }
     .check-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     .check-card { padding:15px 16px; }
     .check-top {
@@ -275,7 +283,7 @@
           </div>
           <div class="plot">
             <div class="plot-label"><strong>Deflection</strong>in</div>
-            <svg viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Placeholder deflected shape">
+            <svg id="deflectionPlot" viewBox="0 0 740 96" preserveAspectRatio="none" role="img" aria-label="Calculated deflected shape">
               <line x1="0" y1="18" x2="740" y2="18" stroke="#e4eaf2"/>
               <path d="M0 18C180 18 260 78 370 78C480 78 560 18 740 18" fill="none" stroke="#d97706" stroke-width="3"/>
               <line x1="370" y1="18" x2="370" y2="78" stroke="#d97706" stroke-dasharray="3 3"/>
@@ -318,6 +326,7 @@
     const loadList = document.getElementById("loadList");
     let pointLoads = [{ magnitude:10, position:10 }];
     let uniformLoads = [{ magnitude:1, start:0, end:20 }];
+    let reactionAndDeflectionContext = null;
 
     function clippedUniformMoment(load, x, leftOfLoad) {
       const start = Math.max(0, load.start);
@@ -424,6 +433,7 @@
       document.getElementById("rightReactionText").textContent =
         support === "Cantilever" ? `-${fixedMoment.toFixed(1)} kip-ft` : `${rightReaction.toFixed(1)} k`;
       drawShearAndMoment(support, span, leftReaction, maxShear, maxMoment);
+      calculateDeflection();
     }
 
     function drawShearAndMoment(support, span, leftReaction, maxShear, maxMoment) {
@@ -494,9 +504,165 @@
         value => `${value.toFixed(1)} ${unitFor(value)} max`, "k");
       drawArea(document.getElementById("momentPlot"), momentValues, "#16a34a", "#dcfce7",
         value => `${Math.abs(value).toFixed(1)} kip-ft at ${maxMoment.x.toFixed(2)} ft`, "");
+      reactionAndDeflectionContext = { support, span, leftReaction };
     }
 
     function unitFor() { return "k"; }
+
+    function momentAt(x) {
+      if (!reactionAndDeflectionContext) return 0;
+      const {support, span, leftReaction}=reactionAndDeflectionContext;
+      if (support === "Cantilever") {
+        let moment=-pointLoads.reduce((sum,load)=>sum+(load.position>x?load.magnitude*(load.position-x):0),0);
+        uniformLoads.forEach(load=>{
+          const start=Math.max(0,load.start);
+          const end=Math.min(span,load.end);
+          const low=Math.max(start,x);
+          if(end>low) moment-=load.magnitude*(end-low)*(end+low-2*x)/2;
+        });
+        return moment;
+      }
+      let moment=leftReaction*x-pointLoads.reduce((sum,load)=>sum+(load.position<x?load.magnitude*(x-load.position):0),0);
+      uniformLoads.forEach(load=>{
+        const start=Math.max(0,load.start);
+        const end=Math.min(span,load.end);
+        const b=Math.min(x,end);
+        if(b>start) moment-=load.magnitude*(b-start)*(x-(start+b)/2);
+      });
+      return moment;
+    }
+
+    function sectionProperties() {
+      const steel=sectionSelect.value !== "2x8" && sectionSelect.value !== "2x10" && sectionSelect.value !== "2x12";
+      if(steel) {
+        const values={
+          "W8x10":30.8,"W10x12":53.8,"W12x26":204,"W14x22":199,
+          "W16x26":301,"W18x35":510,"W21x44":843,"W24x55":1350
+        };
+        return {E:29000,I:values[sectionSelect.value]||204};
+      }
+      const values={"2x8":47.63,"2x10":98.93,"2x12":177.98};
+      return {E:1600,I:values[sectionSelect.value]||98.93};
+    }
+
+    function calculateDeflection() {
+      if(!reactionAndDeflectionContext) reactionAndExtrema();
+      const {support,span}=reactionAndDeflectionContext;
+      const {E,I}=sectionProperties();
+      const EI=E*I;
+      const step=0.05;
+      const points=[];
+      let theta=0;
+      let rawY=0;
+      let previousMoment=momentAt(0);
+      let previousTheta=0;
+      let previousY=0;
+      for(let x=0;x<=span+0.0001;x+=step) {
+        const xx=Math.round(Math.min(span,x)*20)/20;
+        const moment=momentAt(xx);
+        const dx=x===0?0:step*12;
+        if(x>0) {
+          const previousX=Math.max(0,xx-step);
+          const c1=previousMoment*12/EI;
+          const c2=moment*12/EI;
+          theta+=((c1+c2)/2)*dx;
+          rawY+=((previousTheta+theta)/2)*dx;
+        }
+        points.push({x:xx,y:rawY,theta});
+        previousTheta=theta;
+        previousY=rawY;
+        previousMoment=moment;
+      }
+
+      const rightRaw=points[points.length-1].y;
+      points.forEach(point=>{
+        if(support==="Simply supported") point.y-=rightRaw*(point.x/span);
+        if(support==="Cantilever") point.y=-point.y;
+      });
+
+      let maxPoint=points.reduce((best,point)=>Math.abs(point.y)>Math.abs(best.y)?point:best,points[0]);
+      drawDeflection(points,maxPoint);
+      return {points,maxPoint};
+    }
+
+    function drawDeflection(points,maxPoint) {
+      const svg=document.getElementById("deflectionPlot");
+      const width=740;
+      const absMax=Math.max(0.01,...points.map(point=>Math.abs(point.y)));
+      const center=48;
+      const scale=32/absMax;
+      const line=points.map((point,i)=>{
+        const x=i*width/Math.max(1,points.length-1);
+        const y=center-point.y*scale;
+        return `${i===0?"M":"L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+      }).join(" ");
+      const maxIndex=points.indexOf(maxPoint);
+      const maxX=maxIndex*width/Math.max(1,points.length-1);
+      const maxY=center-maxPoint.y*scale;
+      svg.innerHTML=`<line x1="0" y1="${center}" x2="${width}" y2="${center}" stroke="#e4eaf2"/>
+        <path d="${line}" fill="none" stroke="#d97706" stroke-width="3"/>
+        <line x1="${maxX}" y1="${center}" x2="${maxX}" y2="${maxY}" stroke="#d97706" stroke-dasharray="3 3"/>
+        <text x="${maxX}" y="${Math.max(12,maxY-5)}" text-anchor="middle" fill="#b45309" font-size="11" font-weight="800">${Math.abs(maxPoint.y).toFixed(3)} in at ${maxPoint.x.toFixed(2)} ft</text>`;
+    }
+
+    function setupPlotHover() {
+      const plots=[document.getElementById("shearPlot"),document.getElementById("momentPlot"),document.getElementById("deflectionPlot")];
+      plots.forEach(svg=>{
+        svg.onmousemove=event=>{
+          const rect=svg.getBoundingClientRect();
+          const fraction=Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width));
+          const context=reactionAndDeflectionContext;
+          if(!context) return;
+          const x=context.span*fraction;
+          let shear=context.leftReaction-pointLoads.reduce((sum,load)=>sum+(load.position<=x?load.magnitude:0),0);
+          uniformLoads.forEach(load=>{
+            const start=Math.max(0,load.start);
+            const end=Math.min(context.span,load.end);
+            const b=Math.min(x,end);
+            if(context.support==="Simply supported"&&b>start) shear-=load.magnitude*(b-start);
+          });
+          if(context.support==="Cantilever") {
+            shear=pointLoads.reduce((sum,load)=>sum+(load.position>x?load.magnitude:0),0);
+            uniformLoads.forEach(load=>{
+              const start=Math.max(0,load.start);
+              const end=Math.min(context.span,load.end);
+              if(end>x) shear+=load.magnitude*(end-Math.max(start,x));
+            });
+          }
+          const moment=momentAt(x);
+          const deflection=calculateDeflection();
+          const nearest=deflection.points.reduce((best,point)=>Math.abs(point.x-x)<Math.abs(best.x-x)?point:best,deflection.points[0]);
+          plots.forEach(plot=>{
+            let line=plot.querySelector(".hover-line");
+            if(!line) {
+              line=document.createElementNS("http://www.w3.org/2000/svg","line");
+              line.setAttribute("class","hover-line");
+              line.setAttribute("y1","4"); line.setAttribute("y2","92");
+              line.setAttribute("stroke","#94a3b8"); line.setAttribute("stroke-width","1");
+              line.setAttribute("stroke-dasharray","2 2");
+              plot.appendChild(line);
+            }
+            line.setAttribute("x1",fraction*740); line.setAttribute("x2",fraction*740);
+            let readout=plot.parentElement.querySelector(".hover-readout");
+            if(!readout) {
+              readout=document.createElement("div");
+              readout.className="hover-readout";
+              plot.parentElement.appendChild(readout);
+            }
+            readout.style.display="block";
+            readout.textContent=`${x.toFixed(2)} ft · V ${shear.toFixed(2)} k · M ${moment.toFixed(2)} kip-ft · y ${nearest.y.toFixed(3)} in`;
+          });
+        };
+        svg.onmouseleave=()=>{
+          plots.forEach(plot=>{
+            const line=plot.querySelector(".hover-line");
+            if(line) line.remove();
+            const readout=plot.parentElement.querySelector(".hover-readout");
+            if(readout) readout.style.display="none";
+          });
+        };
+      });
+    }
 
     function getSpan() {
       return Math.max(4, Math.min(40, Number(spanNumber.value) || 20));
@@ -514,6 +680,7 @@
       renderLoads();
       updateMockPoint();
       reactionAndExtrema();
+      setupPlotHover();
     }
 
     spanRange.addEventListener("input", () => setSpan(spanRange.value));
