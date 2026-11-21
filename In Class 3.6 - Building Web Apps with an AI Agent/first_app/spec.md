@@ -11,17 +11,31 @@ A civil engineering student checking a homework beam, or an engineer
 sizing a floor beam or deck joist.
 
 ## Inputs
-- Support type: Simply supported or Cantilever (fixed at the left end).
-- Span: 4 to 40 ft, set with a slider and a number box that stay in sync.
+- Support type: dropdown with Simply supported (default) or Cantilever
+  (fixed at the left end).
+- Span: 4 to 40 ft, default 20 ft, set with a slider and number box that
+  stay in sync.
 - Loads, listed in a panel where each can be edited or removed:
   - Point loads: magnitude (kips, downward positive) and position (ft).
     A new point load starts at midspan (at the free end of a cantilever).
+    Default magnitude is 1 kip; allow 0 to 100 kips. Position range is
+    0 to span ft in 0.25-ft increments. Use a number input and permit
+    dragging on the beam, snapping to 0.25 ft.
   - Uniform loads: magnitude (kips/ft) and start and end positions (ft).
+    Default magnitude is 1 kip/ft; allow 0 to 10 kip/ft. A new uniform
+    load starts at 0 ft and ends at span, with positions ranging from 0 to
+    span ft in 0.25-ft increments. Require start <= end.
   - "Add point load" and "Add uniform load" buttons.
+  - An explicit remove control for every point and uniform load.
   - Point loads can also be dragged along the beam in the drawing,
     snapping to 0.25 ft.
   - Loads that extend past the end of the beam are cut off at the end.
-- Material and section, from these tables:
+  - Clamp load positions to the beam endpoints, reject negative magnitudes,
+    and show inline validation.
+- Material and section, as separate dropdown controls from these tables:
+  Steel is the default material and W12x26 is the default section.
+  Selecting Douglas Fir-Larch should default to 2x8; switching back to
+  Steel should default to W12x26.
 
   Steel W-shapes (E = 29,000 ksi, allowable bending stress Fb = 30 ksi):
 
@@ -44,24 +58,55 @@ sizing a floor beam or deck joist.
   | 2x10    | 98.93     | 21.39     |
   | 2x12    | 177.98    | 31.64     |
 
-- Deflection limit: L/240 or L/360 (default L/360).
+- Deflection limit: radio or dropdown with L/240 and L/360; default L/360.
 - Self-weight is ignored.
 
 ## Calculations
-- Reactions from statics.
+- Sign conventions: x is measured in feet from the left end; downward
+  loads are positive, shear is positive upward on the left face, moment is
+  positive sagging (tension at the bottom), and deflection y is positive
+  downward.
+- Reactions from statics. For a simply supported beam, sum vertical forces
+  and moments and solve for R_left and R_right. R_left is
+  (sum P_i(L - a_i) + sum integral w_i(L - x) dx)/L, with each point load
+  P_i at a_i and each uniform load integrated only over the portion on the
+  beam. R_right is total downward load minus R_left. For a cantilever,
+  the left vertical reaction is the total downward load upward and the left
+  fixed-end moment reaction is the sum P_i a_i plus integral w_i x dx,
+  with direction counteracting the downward-load moment.
 - Shear V(x) and moment M(x) along the beam, at 1 ft spacing or finer,
   plus exactly at every load point and load start/end.
+  Maximum shear is the absolute maximum |V(x)|. The shear and moment
+  diagrams may also report their signed minimum and maximum values.
+  Calculate values exactly at load discontinuities and boundaries, not
+  only from 1-ft samples.
 - Deflection y(x) by integrating M/EI twice with the boundary conditions
   for the support type (y = 0 at both supports; or y = 0 and slope = 0 at
   the fixed end).
+  E is the material modulus from the selected table, I is Ix for the
+  selected section, EI is in ksi-in^4, slope is dy/dx, and y is in inches.
+  Use consistent unit conversions while integrating M/EI so the result is
+  returned in inches.
 - Bending stress fb = |M max| x 12 / Sx (ksi). Bending check passes if
   fb <= Fb.
+  M max is the absolute maximum moment, Sx is section modulus from the
+  selected table, and Fb is 30 ksi for steel or 0.900 ksi for lumber.
+  Convert M from kip-ft to kip-in by multiplying by 12, then divide by Sx
+  in in^3 to obtain ksi.
 - Deflection check passes if |y max| <= L/240 or L/360 (L in inches).
+  y max is max |y(x)| and L is span ft x 12, in inches. The deflection
+  card ratio is |y max| divided by the allowable deflection.
 - Lightest passing section: of the sections in the chosen material, the
   lightest steel section that passes both checks (if two weigh the same,
   the one with the larger Ix), or the first lumber size in the table
   that passes.
+  Use Ix and Sx from the selected material table. Include fb/Fb and
+  |y max|/allowable deflection as the bending and deflection card ratios.
+  If no section passes, display "No passing section" and offer no use-section
+  action.
 - Units: kips, ft, and kip-ft on screen; inches for deflection.
+  Moment is in kip-ft for display, in kip-in for bending stress, span is
+  in inches for deflection limits, and EI is in ksi-in^4 for deflection.
 
 ## Outputs
 - A beam drawing with the supports, load arrows (point loads as single
@@ -107,3 +152,25 @@ sizing a floor beam or deck joist.
 - Self-weight, shear stress, lateral-torsional buckling, load
   combinations, and continuous beams.
 - Saving designs.
+
+## Resolved notes
+- Support type defaults to Simply supported and uses a dropdown.
+- Span defaults to 20 ft and uses a synced slider and number box.
+- Point loads default to 1 kip, range from 0 to 100 kips, and use 0.25-ft
+  positions from 0 to span; they can be entered in a number field or dragged
+  on the beam.
+- Uniform loads default to 1 kip/ft, range from 0 to 10 kip/ft, and default
+  to a full-span distribution from 0 ft to span.
+- Load positions clamp to beam endpoints, negative magnitudes show inline
+  validation and are rejected, and uniform-load start must not exceed end.
+- Each load has an explicit remove control.
+- Material and section use separate dropdowns; the default is Steel W12x26,
+  switching to Douglas Fir-Larch defaults to 2x8, and switching back to Steel
+  defaults to W12x26.
+- Deflection limit defaults to L/360 and uses a radio or dropdown control.
+- Reset-to-example is not required for the v1 scope.
+- Reactions, shear, moment, and deflection use one documented sign convention
+  and consistent units, with load discontinuities evaluated exactly.
+- Check-card ratios are fb/Fb and |y max|/allowable deflection.
+- If no section passes, the app displays "No passing section" and offers no
+  use-section action.

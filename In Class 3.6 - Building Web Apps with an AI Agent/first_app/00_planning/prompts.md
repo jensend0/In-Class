@@ -1,2 +1,6 @@
 - 2026-11-20: Commit the tagged AGENTS.md change. Added the session entry to this prompts log. The commit is being created and verified.
 - 2026-11-20: Commit the tagged spec.md change. Added the Beam Designer specification and this session entry to prompts.md. Commit created and verified successfully.
+- 2026-11-20: Reviewed spec.md at the whole-app level and summarized the app, missing requirements, and section order without changing the code or spec.
+- 2026-11-20: Reviewed only the Inputs section of spec.md, identified missing/default/range/control details, and clarified load defaults and limits with the user. No code or spec build changes were made.
+- 2026-11-20: Reviewed the Calculations section of spec.md for equations, units, undefined variables, and missing output calculations. No code or spec changes were made.
+- 2026-11-20: Addressed and moved the resolved input/calculation notes into spec.md, performed a whole-spec consistency review, and prepared the spec for commit.
