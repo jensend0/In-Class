@@ -11,3 +11,4 @@
 - 2026-11-20: Built stage 3: real reaction, shear, and moment calculations and dynamic beam/shear/moment plots. Deflection and check cards remain placeholder values.
 - 2026-11-20: Built stage 4: numerical deflection integration, a real deflected-shape plot, and synchronized hover readouts across shear, moment, and deflection plots. Check cards remain placeholders.
 - 2026-11-20: Built stage 5: live bending and deflection checks, PASS/FAIL ratios and bar colors, lightest passing section selection, and use-section behavior. No stage 6 polish remains.
+- 2026-11-20: Built stage 6: immediate input updates, keyboard/focus styling, accessible control labels and live status, formula help, and final responsive polish.

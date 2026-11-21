@@ -18,6 +18,9 @@
       background:var(--canvas);
     }
     button,input,select { font:inherit; }
+    button:focus-visible,input:focus-visible,select:focus-visible {
+      outline:3px solid #93c5fd; outline-offset:2px;
+    }
     .app-header {
       height:68px; display:flex; align-items:center; padding:0 28px;
       background:#fff; border-bottom:1px solid var(--line);
@@ -191,7 +194,7 @@
         <h2 class="card-title">Beam</h2>
         <div class="field">
           <div class="field-label"><span>Support type</span></div>
-          <select id="supportSelect">
+          <select id="supportSelect" aria-label="Support type">
             <option selected>Simply supported</option>
             <option>Cantilever</option>
           </select>
@@ -218,11 +221,11 @@
         <h2 class="card-title">Section</h2>
         <div class="field">
           <div class="field-label"><span>Material</span></div>
-          <select id="materialSelect"><option selected>Steel</option><option>Douglas Fir-Larch</option></select>
+          <select id="materialSelect" aria-label="Material"><option selected>Steel</option><option>Douglas Fir-Larch</option></select>
         </div>
         <div class="field">
           <div class="field-label"><span>Section</span></div>
-          <select id="sectionSelect"></select>
+          <select id="sectionSelect" aria-label="Beam section"></select>
         </div>
         <div class="field">
           <div class="field-label"><span>Deflection limit</span></div>
@@ -238,7 +241,7 @@
       <div class="results">
         <section class="card beam-card">
           <div class="section-heading">
-            <h2>Beam and reactions</h2><div class="status-pill">RESULTS READY</div>
+            <h2>Beam and reactions</h2><div class="status-pill" role="status" aria-live="polite">RESULTS READY</div>
           </div>
           <svg class="beam-svg" viewBox="0 0 900 128" role="img" aria-label="Beam with supports and loads">
             <line x1="80" y1="58" x2="820" y2="58" stroke="#26384c" stroke-width="7" stroke-linecap="round"/>
@@ -772,7 +775,9 @@
     }
 
     spanRange.addEventListener("input", () => setSpan(spanRange.value));
-    spanNumber.addEventListener("change", () => setSpan(spanNumber.value));
+    spanNumber.addEventListener("input", () => {
+      if(spanNumber.value >= 4 && spanNumber.value <= 40) setSpan(spanNumber.value);
+    });
 
     function validateMagnitude(input, max) {
       const value = Number(input.value);
@@ -794,7 +799,7 @@
     function loadField(label, unit, value, max, position, index, key) {
       return `<div class="mini-field">
         <label>${label} · ${unit}</label>
-        <input type="number" value="${value}" min="0" max="${max}" step="${position ? "0.25" : "0.05"}"
+        <input type="number" value="${value}" min="0" max="${max}" step="${position ? "0.25" : "0.05"}" aria-label="${label} in ${unit}"
           data-index="${index}" data-key="${key}" ${position ? 'data-position="true"' : ""}>
         <div class="error-text"></div>
       </div>`;
@@ -837,6 +842,18 @@
             validatePosition(input);
           } else {
             validateMagnitude(input, isPoint ? 100 : 10);
+          }
+          const valid=!input.classList.contains("input-error");
+          if(valid) {
+            let value=Number(input.value);
+            if(input.dataset.position) value=Math.round(Math.max(0,Math.min(getSpan(),value))*4)/4;
+            else value=Math.max(0,Math.min(isPoint?100:10,value));
+            if(isPoint) pointLoads[index][key]=value;
+            else uniformLoads[index][key]=value;
+            if(!isPoint&&key==="start"&&uniformLoads[index].end<value) uniformLoads[index].end=value;
+            if(!isPoint&&key==="end"&&uniformLoads[index].start>value) uniformLoads[index].start=value;
+            reactionAndExtrema();
+            updateMockPoint();
           }
         });
         input.addEventListener("change", () => {
