@@ -294,28 +294,28 @@
 
         <section class="check-grid">
           <article class="check-card" title="fb = |M max| × 12 / Sx">
-            <div class="check-top"><div class="check-name">Bending</div><div class="check-badge">PASS</div></div>
+            <div class="check-top"><div class="check-name">Bending</div><div id="bendingBadge" class="check-badge">PASS</div></div>
             <div class="check-values">
-              <div>Actual<strong>17.96 ksi</strong></div>
-              <div>Allowable<strong>30.00 ksi</strong></div>
-              <div>Ratio<strong>59.9%</strong></div>
+              <div>Actual<strong id="bendingActual">17.96 ksi</strong></div>
+              <div>Allowable<strong id="bendingAllowable">30.00 ksi</strong></div>
+              <div>Ratio<strong id="bendingRatio">59.9%</strong></div>
             </div>
-            <div class="bar"><div class="bar-fill" style="width:59.9%"></div></div>
+            <div class="bar"><div id="bendingBar" class="bar-fill" style="width:59.9%"></div></div>
           </article>
           <article class="check-card" title="Deflection limit = L/360; y max is the maximum absolute deflection">
-            <div class="check-top"><div class="check-name">Deflection</div><div class="check-badge">PASS</div></div>
+            <div class="check-top"><div class="check-name">Deflection</div><div id="deflectionBadge" class="check-badge">PASS</div></div>
             <div class="check-values">
-              <div>Actual<strong>0.609 in</strong></div>
-              <div>Allowable<strong>0.667 in</strong></div>
-              <div>Ratio<strong>91.3%</strong></div>
+              <div>Actual<strong id="deflectionActual">0.609 in</strong></div>
+              <div>Allowable<strong id="deflectionAllowable">0.667 in</strong></div>
+              <div>Ratio<strong id="deflectionRatio">91.3%</strong></div>
             </div>
-            <div class="bar"><div class="bar-fill" style="width:91.3%;background:#d97706"></div></div>
+            <div class="bar"><div id="deflectionBar" class="bar-fill" style="width:91.3%;background:#d97706"></div></div>
           </article>
         </section>
 
-        <section class="recommendation">
-          <div>Lightest passing section: <strong>W12x26</strong> · 26 lb/ft · both checks pass</div>
-          <button class="primary-button">Use W12x26</button>
+        <section id="recommendation" class="recommendation">
+          <div id="recommendationText">Lightest passing section: <strong>W12x26</strong> · 26 lb/ft · both checks pass</div>
+          <button id="useSection" class="primary-button" type="button">Use W12x26</button>
         </section>
       </div>
     </main>
@@ -433,7 +433,9 @@
       document.getElementById("rightReactionText").textContent =
         support === "Cantilever" ? `-${fixedMoment.toFixed(1)} kip-ft` : `${rightReaction.toFixed(1)} k`;
       drawShearAndMoment(support, span, leftReaction, maxShear, maxMoment);
-      calculateDeflection();
+      const deflection=calculateDeflection();
+      reactionAndDeflectionContext.maxDeflection=deflection.maxPoint;
+      updateChecks();
     }
 
     function drawShearAndMoment(support, span, leftReaction, maxShear, maxMoment) {
@@ -504,7 +506,7 @@
         value => `${value.toFixed(1)} ${unitFor(value)} max`, "k");
       drawArea(document.getElementById("momentPlot"), momentValues, "#16a34a", "#dcfce7",
         value => `${Math.abs(value).toFixed(1)} kip-ft at ${maxMoment.x.toFixed(2)} ft`, "");
-      reactionAndDeflectionContext = { support, span, leftReaction };
+      reactionAndDeflectionContext = { support, span, leftReaction, maxMoment };
     }
 
     function unitFor() { return "k"; }
@@ -543,6 +545,92 @@
       }
       const values={"2x8":47.63,"2x10":98.93,"2x12":177.98};
       return {E:1600,I:values[sectionSelect.value]||98.93};
+    }
+
+    function updateChecks() {
+      if(!reactionAndDeflectionContext) return;
+      const context=reactionAndDeflectionContext;
+      const steel=materialSelect.value==="Steel";
+      const E=steel?29000:1600;
+      const Fb=steel?30:0.900;
+      const I=sectionProperties().I;
+      const steelSx={"W8x10":7.81,"W10x12":10.9,"W12x26":33.4,"W14x22":29,"W16x26":38.4,"W18x35":57.6,"W21x44":81.6,"W24x55":114};
+      const lumberSx={"2x8":13.14,"2x10":21.39,"2x12":31.64};
+      const Sx=steel?steelSx[sectionSelect.value]:lumberSx[sectionSelect.value];
+      const maxMoment=context.maxMoment?.value||0;
+      const bending=maxMoment*12/Sx;
+      const bendingRatio=bending/Fb;
+      const limitDenominator=document.querySelector("input[name='limit']:checked").nextSibling ? 360 : 240;
+      const limitText=document.querySelector("input[name='limit']:checked").parentElement.textContent.trim();
+      const denominator=limitText.includes("240")?240:360;
+      const allowableDeflection=context.span*12/denominator;
+      const actualDeflection=Math.abs(context.maxDeflection?.y||0);
+      const deflectionRatio=actualDeflection/allowableDeflection;
+
+      setCheck("bending",bending,bendingRatio,Fb,"ksi");
+      setCheck("deflection",actualDeflection,deflectionRatio,allowableDeflection,"in");
+
+      const candidates=steel
+        ? [
+            {name:"W8x10",I:30.8,Sx:7.81,weight:10},
+            {name:"W10x12",I:53.8,Sx:10.9,weight:12},
+            {name:"W12x26",I:204,Sx:33.4,weight:26},
+            {name:"W14x22",I:199,Sx:29,weight:22},
+            {name:"W16x26",I:301,Sx:38.4,weight:26},
+            {name:"W18x35",I:510,Sx:57.6,weight:35},
+            {name:"W21x44",I:843,Sx:81.6,weight:44},
+            {name:"W24x55",I:1350,Sx:114,weight:55}
+          ]
+        : [
+            {name:"2x8",I:47.63,Sx:13.14},
+            {name:"2x10",I:98.93,Sx:21.39},
+            {name:"2x12",I:177.98,Sx:31.64}
+          ];
+      const currentEI=E*I;
+      const passing=candidates.filter(candidate=>{
+        const candidateBending=maxMoment*12/candidate.Sx;
+        const candidateDeflection=actualDeflection*(currentEI/(E*candidate.I));
+        return candidateBending<=Fb&&candidateDeflection<=allowableDeflection;
+      });
+      let recommendation=null;
+      if(steel) {
+        recommendation=passing.sort((a,b)=>a.weight-b.weight||(b.I-a.I))[0]||null;
+      } else {
+        recommendation=passing[0]||null;
+      }
+      const text=document.getElementById("recommendationText");
+      const button=document.getElementById("useSection");
+      if(recommendation) {
+        text.innerHTML=steel
+          ? `Lightest passing section: <strong>${recommendation.name}</strong> · ${recommendation.weight} lb/ft · both checks pass`
+          : `Lightest passing section: <strong>${recommendation.name}</strong> · both checks pass`;
+        button.textContent=`Use ${recommendation.name}`;
+        button.style.display="";
+        button.onclick=()=>{
+          sectionSelect.value=recommendation.name;
+          reactionAndExtrema();
+        };
+      } else {
+        text.textContent="No passing section";
+        button.style.display="none";
+      }
+    }
+
+    function setCheck(kind,actual,ratio,allowable,unit) {
+      const actualText=unit==="ksi"?actual.toFixed(2)+ " ksi":actual.toFixed(3)+" in";
+      const allowableText=unit==="ksi"?allowable.toFixed(2)+" ksi":allowable.toFixed(3)+" in";
+      document.getElementById(kind+"Actual").textContent=actualText;
+      document.getElementById(kind+"Allowable").textContent=allowableText;
+      document.getElementById(kind+"Ratio").textContent=(ratio*100).toFixed(1)+"%";
+      const badge=document.getElementById(kind+"Badge");
+      badge.textContent=ratio<=1?"PASS":"FAIL";
+      badge.style.background=ratio<=1?"#dcfce7":"#fee2e2";
+      badge.style.color=ratio<=1?"#15803d":"#b91c1c";
+      const bar=document.getElementById(kind+"Bar");
+      bar.style.width=Math.min(100,ratio*100)+"%";
+      if(ratio<0.7) { bar.style.background="#16a34a"; }
+      else if(ratio<=1) { bar.style.background="#d97706"; }
+      else { bar.style.background="#dc2626"; }
     }
 
     function calculateDeflection() {
@@ -806,12 +894,17 @@
       sectionSelect.innerHTML = options.map(section => `<option${section === defaultValue ? " selected" : ""}>${section}</option>`).join("");
     }
     updateSections("W12x26");
-    materialSelect.addEventListener("change", () => updateSections(materialSelect.value === "Steel" ? "W12x26" : "2x8"));
+    materialSelect.addEventListener("change", () => {
+      updateSections(materialSelect.value === "Steel" ? "W12x26" : "2x8");
+      reactionAndExtrema();
+    });
+    sectionSelect.addEventListener("change", reactionAndExtrema);
 
     document.querySelectorAll("input[name='limit']").forEach(input => {
       input.addEventListener("change", () => {
         document.querySelectorAll(".radio-choice").forEach(label => label.classList.remove("selected"));
         input.closest(".radio-choice").classList.add("selected");
+        reactionAndExtrema();
       });
     });
 
